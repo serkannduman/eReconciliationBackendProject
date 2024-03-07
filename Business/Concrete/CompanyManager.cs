@@ -1,6 +1,8 @@
 ﻿using Business.Abstract;
+using Business.Constants;
+using Core.Utilities.Results.Abstract;
+using Core.Utilities.Results.Concrete;
 using DataAccess.Abstract;
-using DataAccess.Concrete.EntityFramework;
 using Entities.Concrete;
 
 namespace Business.Concrete;
@@ -14,8 +16,20 @@ public class CompanyManager : ICompanyService
         _companyDal = companyDal;
     }
 
-    public List<Company> GetList()
+    public IResult Add(Company company)
     {
-        return _companyDal.GetList();
+        if(company.Name.Length > 10)
+        {
+            _companyDal.Add(company);
+            return new SuccessResult(Messages.AddedCompany);
+        }
+
+        return new ErrorResult("Şirket adı en az 10 karakter olmalıdır");
+        
+    }
+
+    public IDataResult<List<Company>> GetList()
+    {
+        return new SuccessDataResult<List<Company>>(_companyDal.GetList());
     }
 }
