@@ -5,8 +5,10 @@ using Core.Utilities.Hashing;
 using Core.Utilities.Results.Abstract;
 using Core.Utilities.Results.Concrete;
 using Core.Utilities.Security.JWT;
+using Entities.Concrete;
 using Entities.Dtos;
 using Microsoft.VisualBasic;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
 namespace Business.Concrete;
 
@@ -14,11 +16,22 @@ public class AuthManager : IAuthService
 {
     private readonly IUserService _userService;
     private readonly ITokenHelper _tokenHelper;
+    private readonly ICompanyService _companyService;
 
-    public AuthManager(IUserService userService, ITokenHelper tokenHelper)
+    public AuthManager(IUserService userService, ITokenHelper tokenHelper, ICompanyService companyService)
     {
         _userService = userService;
         _tokenHelper = tokenHelper;
+        _companyService = companyService;
+    }
+
+    public IResult CompanyExists(Company company)
+    {
+        var result = _companyService.CompanyExists(company);
+        if (result.Success == false)
+            return new ErrorResult(Messages.CompanyAlreadyExists);
+
+        return new SuccessResult();
     }
 
     public IDataResult<AccessToken> CreateAccessToken(User user, int companyId)
@@ -40,7 +53,7 @@ public class AuthManager : IAuthService
         return new SuccessDataResult<User>(userToCheck, Messages.SuccessfulLogin);
     }
 
-    public IDataResult<User> Register(UserForRegister userForRegister, string password)
+    public IDataResult<UserCompanyDto> Register(UserForRegister userForRegister, string password,Company company)
     {
         byte[] passwordHash, passwordSalt;
         HashingHelper.CreatePasswordHash(password,out passwordHash,out passwordSalt);
@@ -58,14 +71,39 @@ public class AuthManager : IAuthService
         };
 
         _userService.Add(user);
-        return new SuccessDataResult<User>(user, Messages.UserRegistered);
+        _companyService.Add(company);
+
+        _companyService.UserCompanyAdd(user.Id, company.Id);
+
+        UserCompanyDto userCompanyDto = new UserCompanyDto()
+        {
+            Id = user.Id,
+            Name = user.Name,
+            Email = user.Email,
+            AddedAt = user.AddedAt,
+            CompanyId = company.Id,
+            IsActive = true,
+            MailConfirm = user.MailConfirm,
+            MailConfirmDate = user.MailConfirmDate,
+            MailConfirmValue = user.MailConfirmValue,
+            PasswordHash = user.PasswordHash,
+            PasswordSalt = user.PasswordSalt,
+        };
+
+        return new SuccessDataResult<UserCompanyDto>(userCompanyDto, Messages.UserRegistered);
+    }
+
+    public IDataResult<User> RegisterSecondAccount(UserForRegister userForRegister, string password)
+    {
+        throw new NotImplementedException();
     }
 
     public IResult UserExists(string email)
     {
-        if (_userService.GetByEmail(email) != null)
+        if (_userService.GetByEmail(email)!= null)
+        {
             return new ErrorResult(Messages.UserAlreadyExists);
-
+        }
         return new SuccessResult();
     }
 }

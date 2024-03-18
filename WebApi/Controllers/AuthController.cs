@@ -1,4 +1,5 @@
 ﻿using Business.Abstract;
+using Entities.Concrete;
 using Entities.Dtos;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -18,16 +19,22 @@ namespace WebApi.Controllers
         }
 
         [HttpPost("register")]
-        public IActionResult Register(UserForRegister userForRegister)
+        public IActionResult Register(UserAndCompanyRegisterDto userAndCompanyRegisterDto)
         {
-            var userExists = _authService.UserExists(userForRegister.Email);
+            var userExists = _authService.UserExists(userAndCompanyRegisterDto.UserForRegister.Email);
             if (!userExists.Success)
-                return BadRequest(userExists.Message);
+                return BadRequest(userExists.Message);  
 
-            var registerResult = _authService.Register(userForRegister, userForRegister.Password);
+            var companyExists = _authService.CompanyExists(userAndCompanyRegisterDto.Company);
+            if (!companyExists.Success)
+                return BadRequest(companyExists.Message);
 
-            if (registerResult.Success)
-                return Ok(registerResult);
+            var registerResult = _authService.Register(userAndCompanyRegisterDto.UserForRegister, userAndCompanyRegisterDto.UserForRegister.Password, userAndCompanyRegisterDto.Company);
+
+            var result = _authService.CreateAccessToken(registerResult.Data, registerResult.Data.CompanyId);
+
+            if (result.Success)
+                return Ok(result.Data);
 
             return BadRequest(registerResult.Message);
         }
